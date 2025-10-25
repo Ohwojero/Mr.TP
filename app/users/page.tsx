@@ -233,7 +233,10 @@ export default function UsersPage() {
               All Users
             </CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400 text-base">
-              Total users: <span className="font-semibold text-slate-900 dark:text-white">{users.length}</span>
+              Total users:{" "}
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {users.length}
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -244,6 +247,7 @@ export default function UsersPage() {
               searchPlaceholder="Search by name or email..."
             />
           </CardContent>
+        </Card>
       </main>
     </div>
   );
