@@ -1,6 +1,7 @@
-# TODO: Make Inventory Management and Add Product Responsive
+# TODO: Make User Management, Expenses Tracking, Sales Management, and Add Product Responsive
 
-- [x] Edit app/inventory/page.tsx header flex to flex-col sm:flex-row
-- [x] Adjust title font size to text-2xl sm:text-4xl in app/inventory/page.tsx
-- [x] Update form grids to grid-cols-1 sm:grid-cols-2 in app/inventory/page.tsx
-- [x] Test responsiveness by running the app and checking on mobile view
+- [x] Update app/users/page.tsx header to use flex-col sm:flex-row and adjust title font size
+- [x] Update app/expenses/page.tsx header to use flex-col sm:flex-row and adjust title font size
+- [x] Update app/sales/page.tsx header to use flex-col sm:flex-row and adjust title font size
+- [x] Verify and tweak app/inventory/page.tsx for full responsiveness if needed
+- [x] Test responsiveness by running the app and checking on mobile/small device view

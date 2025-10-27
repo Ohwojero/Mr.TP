@@ -198,7 +198,7 @@ export default function InventoryPage() {
 
       {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-12">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
           <Link href="/dashboard">
             <Button
               variant="ghost"
@@ -210,13 +210,13 @@ export default function InventoryPage() {
             </Button>
           </Link>
           <div className="flex-1">
-            <h2 className="text-2xl sm:text-4xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
               <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
                 <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
               </div>
               Inventory Management
             </h2>
-            <p className="text-slate-600 dark:text-slate-400 mt-2 text-lg">
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
               Manage products and stock levels efficiently
             </p>
           </div>

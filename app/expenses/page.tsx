@@ -170,7 +170,7 @@ export default function ExpensesPage() {
 
       {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
           <Link href="/dashboard">
             <Button variant="ghost" size="sm" className="hover:bg-white/50">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -178,7 +178,7 @@ export default function ExpensesPage() {
             </Button>
           </Link>
           <div className="flex-1">
-            <h2 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
               <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
                 <DollarSign className="w-6 h-6 text-white" />
               </div>
