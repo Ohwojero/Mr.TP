@@ -147,26 +147,28 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
-                Total Expenses
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-4xl font-bold text-orange-600 dark:text-orange-400">
-                  ${totalExpenses.toFixed(0)}
+          {(user.role === "admin" || user.role === "manager") && (
+            <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
+                  Total Expenses
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-4xl font-bold text-orange-600 dark:text-orange-400">
+                    ${totalExpenses.toFixed(0)}
+                  </div>
+                  <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-full">
+                    <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                  </div>
                 </div>
-                <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-full">
-                  <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 font-medium">
-                Business expenses
-              </p>
-            </CardContent>
-          </Card>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 font-medium">
+                  Business expenses
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Quick Actions */}

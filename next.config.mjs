@@ -6,6 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+  experimental: {
+    swcPlugins: [],
+  },
+};
 
-export default nextConfig
+export default nextConfig;

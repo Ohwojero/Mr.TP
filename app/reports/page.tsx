@@ -24,8 +24,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Download, Printer } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
+import { Button } from "@/components/ui/button";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export default function ReportsPage() {
   const { user, isAuthenticated } = useSelector(
@@ -38,12 +41,18 @@ export default function ReportsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== "admin") {
+    if (
+      !isAuthenticated ||
+      (user?.role !== "admin" && user?.role !== "manager")
+    ) {
       router.push("/dashboard");
     }
   }, [isAuthenticated, user, router]);
 
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (
+    !isAuthenticated ||
+    (user?.role !== "admin" && user?.role !== "manager")
+  ) {
     return null;
   }
 
@@ -128,22 +137,74 @@ export default function ReportsPage() {
     "#14b8a6",
   ];
 
+  const generatePDF = async () => {
+    try {
+      // Target the main content area instead of the entire body
+      const element = document.querySelector("main");
+      if (!element) {
+        console.error("Main content not found");
+        return;
+      }
+
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: true,
+        background: "#ffffff",
+        // @ts-ignore
+        scale: 2, // Add back scale for better quality
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save("inventory-reports.pdf");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try again.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Sidebar />
 
       {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-            <div className="p-2 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            Reports & Analytics
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Business performance and insights
-          </p>
+        <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+              <div className="p-2 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              Reports & Analytics
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
+              Business performance and insights
+            </p>
+          </div>
+          <Button
+            onClick={generatePDF}
+            className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Download PDF
+          </Button>
         </div>
 
         {/* Key Metrics */}
