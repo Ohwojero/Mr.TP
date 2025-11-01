@@ -32,7 +32,7 @@ export function Sidebar() {
   };
 
   const menuItems = [
-    { href: "/dashboard", label: "Dashboard", icon: Package },
+    ...(user?.role !== "salesgirl" ? [{ href: "/dashboard", label: "Dashboard", icon: Package }] : []),
     ...(user?.role === "admin" || user?.role === "manager"
       ? [{ href: "/inventory", label: "Inventory", icon: Package }]
       : []),

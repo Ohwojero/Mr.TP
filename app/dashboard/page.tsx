@@ -34,8 +34,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
+    } else if (user?.role === "salesgirl") {
+      router.push("/sales");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   const handleLogout = () => {
     dispatch(logout());

@@ -42,8 +42,6 @@ import { Plus, Trash2, ShoppingCart, Download, Printer } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
 import { ArrowLeft } from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 export default function SalesPage() {
   const { user, isAuthenticated } = useSelector(
@@ -54,6 +52,10 @@ export default function SalesPage() {
   const { items: users } = useSelector((state: RootState) => state.users);
   const dispatch = useDispatch();
   const router = useRouter();
+
+  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
+  const totalSales = sales.length;
+  const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -133,155 +135,83 @@ export default function SalesPage() {
 
   const generatePDF = async () => {
     try {
-      // Target the main content area instead of the entire body
-      const element = document.querySelector("main");
-      if (!element) {
-        console.error("Main content not found");
-        alert("Error: Main content not found. Please refresh the page and try again.");
-        return;
-      }
-
-      // Add a small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        allowTaint: false,
-        onclone: (clonedDoc: Document) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el: Element) => {
-            const htmlEl = el as HTMLElement;
-            const style = window.getComputedStyle(htmlEl);
-            if (style.backgroundImage && style.backgroundImage !== 'none') {
-              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            // Handle unsupported color functions
-            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              htmlEl.style.setProperty('color', '#000000', 'important');
-            }
-            // Handle other color properties
-            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              const propValue = style.getPropertyValue(prop);
-              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
-                htmlEl.style.setProperty(prop, '#000000', 'important');
-              }
-            });
-          });
-        },
-      } as any);
-
-      const imgData = canvas.toDataURL("image/png");
+      const jsPDF = (await import("jspdf")).default;
       const pdf = new jsPDF("p", "mm", "a4");
 
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      // Set font
+      pdf.setFont("helvetica", "normal");
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Header
+      pdf.setFontSize(20);
+      pdf.text("Mr. TP - Sales Report", 105, 20, { align: "center" });
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+      pdf.setFontSize(12);
+      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 105, 30, { align: "center" });
 
-      pdf.save("sales-summary.pdf");
+      // Table headers
+      const headers = ["Product", "Quantity", "Unit Price", "Total", "Sales Person", "Date", "Payment Mode"];
+      let yPosition = 50;
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+
+      headers.forEach((header, index) => {
+        const xPosition = 10 + (index * 25);
+        pdf.text(header, xPosition, yPosition);
+      });
+
+      yPosition += 10;
+
+      // Table data
+      pdf.setFont("helvetica", "normal");
+
+      sales.forEach((sale) => {
+        const product = products.find((p) => p.id === sale.productId);
+        const salesPerson = users.find((u) => u.id === sale.salesPersonId);
+
+        const rowData = [
+          product?.name || "Unknown",
+          sale.quantity.toString(),
+          `₦${sale.price.toFixed(2)}`,
+          `₦${sale.total.toFixed(2)}`,
+          salesPerson?.name || "Unknown",
+          new Date(sale.date).toLocaleDateString(),
+          sale.paymentMode,
+        ];
+
+        rowData.forEach((data, index) => {
+          const xPosition = 10 + (index * 25);
+          pdf.text(data, xPosition, yPosition);
+        });
+
+        yPosition += 8;
+
+        // Add new page if needed
+        if (yPosition > 270) {
+          pdf.addPage();
+          yPosition = 20;
+        }
+      });
+
+      // Summary
+      yPosition += 10;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text(`Total Sales: ${sales.length}`, 10, yPosition);
+      yPosition += 8;
+      pdf.text(`Total Revenue: ₦${totalRevenue.toFixed(2)}`, 10, yPosition);
+      yPosition += 8;
+      pdf.text(`Average Order Value: ₦${averageOrderValue.toFixed(2)}`, 10, yPosition);
+
+      pdf.save("sales-report.pdf");
     } catch (error) {
       console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again. If the problem persists, try refreshing the page.");
+      alert("Error generating PDF. Please try again.");
     }
   };
 
-  const printPDF = async () => {
-    try {
-      // Target the main content area instead of the entire body
-      const element = document.querySelector("main");
-      if (!element) {
-        console.error("Main content not found");
-        alert("Error: Main content not found. Please refresh the page and try again.");
-        return;
-      }
-
-      // Add a small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        allowTaint: false,
-        onclone: (clonedDoc: Document) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el: Element) => {
-            const htmlEl = el as HTMLElement;
-            const style = window.getComputedStyle(htmlEl);
-            if (style.backgroundImage && style.backgroundImage !== 'none') {
-              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            // Handle unsupported color functions
-            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              htmlEl.style.setProperty('color', '#000000', 'important');
-            }
-            // Handle other color properties
-            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              const propValue = style.getPropertyValue(prop);
-              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
-                htmlEl.style.setProperty(prop, '#000000', 'important');
-              }
-            });
-          });
-        },
-      } as any);
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      // Create a temporary link to download and print the PDF
-      const pdfBlob = pdf.output("blob");
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = pdfUrl;
-      link.download = "sales-summary-print.pdf";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the URL object
-      URL.revokeObjectURL(pdfUrl);
-
-      // Note: Automatic printing is not reliable across browsers due to security restrictions
-      // Users will need to manually open the downloaded PDF and print it
-      alert("PDF downloaded. Please open the file and print it manually.");
-    } catch (error) {
-      console.error("Error generating PDF for printing:", error);
-      alert("Error generating PDF for printing. Please try again. If the problem persists, try refreshing the page.");
-    }
+  const printSales = () => {
+    window.print();
   };
 
   if (
@@ -291,9 +221,70 @@ export default function SalesPage() {
     return null;
   }
 
-  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-  const totalSales = sales.length;
-  const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
+  const handleGenerateReceipt = async (saleId: string) => {
+    const sale = sales.find((s) => s.id === saleId);
+    if (!sale) {
+      alert("Sale not found");
+      return;
+    }
+
+    const product = products.find((p) => p.id === sale.productId);
+    const salesPerson = users.find((u) => u.id === sale.salesPersonId);
+
+    try {
+      const jsPDF = (await import("jspdf")).default;
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      // Set font
+      pdf.setFont("helvetica", "normal");
+
+      // Header
+      pdf.setFontSize(20);
+      pdf.text("Mr. TP", 105, 20, { align: "center" });
+
+      pdf.setFontSize(12);
+      pdf.text("Sales Receipt", 105, 30, { align: "center" });
+
+      // Receipt details
+      pdf.setFontSize(10);
+      let yPosition = 50;
+
+      pdf.text(`Receipt #: ${sale.id}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Sales Person: ${salesPerson?.name || "Unknown"}`, 20, yPosition);
+      yPosition += 20;
+
+      // Product details
+      pdf.setFontSize(12);
+      pdf.text(`Product: ${product?.name || "Unknown"}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Quantity: ${sale.quantity}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Unit Price: ₦${sale.price.toFixed(2)}`, 20, yPosition);
+      yPosition += 10;
+      pdf.text(`Payment Mode: ${sale.paymentMode}`, 20, yPosition);
+      yPosition += 20;
+
+      // Total
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Total: ₦${sale.total.toFixed(2)}`, 105, yPosition, { align: "center" });
+      yPosition += 20;
+
+      // Footer
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(10);
+      pdf.text("Thank you for your business!", 105, yPosition, { align: "center" });
+
+      // Save the PDF
+      pdf.save(`receipt-${sale.id}.pdf`);
+    } catch (error) {
+      console.error("Error generating receipt:", error);
+      alert("Error generating receipt. Please try again.");
+    }
+  };
 
   const tableColumns = [
     {
@@ -339,6 +330,19 @@ export default function SalesPage() {
       label: "Payment Mode",
       render: (value: string) => value,
     },
+    {
+      key: "id",
+      label: "Receipt",
+      render: (value: string) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleGenerateReceipt(value)}
+        >
+          <Download className="w-4 h-4" />
+        </Button>
+      ),
+    },
     ...(user?.role !== "salesgirl" ? [{
       key: "id",
       label: "Actions",
@@ -361,12 +365,14 @@ export default function SalesPage() {
       {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="sm" className="hover:bg-white/50">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </Link>
+          {user?.role !== "salesgirl" && (
+            <Link href="/dashboard">
+              <Button variant="ghost" size="sm" className="hover:bg-white/50">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            </Link>
+          )}
           <div className="flex-1">
             <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
               <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg">
@@ -388,11 +394,11 @@ export default function SalesPage() {
               Download PDF
             </Button>
             <Button
-              onClick={printPDF}
+              onClick={printSales}
               className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
               <Printer className="w-4 h-4 mr-2" />
-              Print PDF
+              Print
             </Button>
           </div>
 
@@ -573,7 +579,7 @@ export default function SalesPage() {
               </span>
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent id="sales-table-container">
             <DataTable
               columns={tableColumns}
               data={sales}
@@ -586,3 +592,6 @@ export default function SalesPage() {
     </div>
   );
 }
+
+
+
