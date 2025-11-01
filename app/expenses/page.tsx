@@ -221,11 +221,11 @@ export default function ExpensesPage() {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={downloadExpensesAsCSV}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
               <Download className="w-4 h-4 mr-2" />
               Download CSV
@@ -233,14 +233,14 @@ export default function ExpensesPage() {
             <Button
               variant="outline"
               onClick={printExpenses}
-              className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Expense
                 </Button>
@@ -396,13 +396,13 @@ export default function ExpensesPage() {
               {expensesByCategory.map((item) => (
                 <div
                   key={item.category}
-                  className="flex items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100/50 dark:hover:bg-slate-600/50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-700/50 rounded-lg hover:bg-slate-100/50 dark:hover:bg-slate-600/50 transition-colors gap-2 sm:gap-4"
                 >
                   <span className="text-sm font-semibold text-slate-900 dark:text-white">
                     {item.category}
                   </span>
-                  <div className="flex items-center gap-4">
-                    <div className="w-40 h-3 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                    <div className="w-full sm:w-40 h-3 bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-red-400 to-red-600 rounded-full transition-all duration-500"
                         style={{
@@ -414,7 +414,7 @@ export default function ExpensesPage() {
                         }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-slate-900 dark:text-white w-24 text-right">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white w-full sm:w-24 text-left sm:text-right">
                       ₦{item.amount.toFixed(2)}
                     </span>
                   </div>
