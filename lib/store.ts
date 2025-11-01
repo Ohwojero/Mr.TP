@@ -104,6 +104,26 @@ const initialProductsState: ProductsState = {
       cost: 40,
       category: "Accessories",
     },
+    {
+      id: "4",
+      name: "Room Booking",
+      sku: "ROOM-001",
+      quantity: 100, // Assuming unlimited availability for services
+      reorderLevel: 0,
+      price: 5000, // Example price for room booking
+      cost: 3000, // Cost to the business
+      category: "Services",
+    },
+    {
+      id: "5",
+      name: "Meals",
+      sku: "MEAL-001",
+      quantity: 200, // Assuming high availability
+      reorderLevel: 10,
+      price: 1500, // Example price for meals
+      cost: 800, // Cost to the business
+      category: "Services",
+    },
   ],
 }
 
