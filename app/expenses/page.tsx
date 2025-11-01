@@ -25,7 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, DollarSign } from "lucide-react";
+import { Plus, Trash2, DollarSign, Download, Printer } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
 import { ArrowLeft } from "lucide-react";
@@ -91,6 +91,38 @@ export default function ExpensesPage() {
   const handleLogout = () => {
     dispatch(logout());
     router.push("/login");
+  };
+
+  const downloadExpensesAsCSV = () => {
+    if (expenses.length === 0) {
+      alert("No expenses to download.");
+      return;
+    }
+
+    const headers = ["Description", "Category", "Amount", "Date"];
+    const csvContent = [
+      headers.join(","),
+      ...expenses.map(expense => [
+        `"${expense.description}"`,
+        `"${expense.category}"`,
+        expense.amount.toFixed(2),
+        new Date(expense.date).toLocaleDateString()
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const printExpenses = () => {
+    window.print();
   };
 
   if (
@@ -189,77 +221,95 @@ export default function ExpensesPage() {
             </p>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Expense
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Record New Expense</DialogTitle>
-                <DialogDescription>
-                  Add a new business expense
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddExpense} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    placeholder="e.g., Office supplies purchase"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={formData.amount}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        amount: Number.parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <select
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
-                  >
-                    {EXPENSE_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <Button type="submit" className="w-full">
-                  Record Expense
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={downloadExpensesAsCSV}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download CSV
+            </Button>
+            <Button
+              variant="outline"
+              onClick={printExpenses}
+              className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+            <Dialog open={isOpen} onOpenChange={setIsOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Expense
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Record New Expense</DialogTitle>
+                  <DialogDescription>
+                    Add a new business expense
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddExpense} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      placeholder="e.g., Office supplies purchase"
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({ ...formData, description: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={formData.amount}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          amount: Number.parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <select
+                      id="category"
+                      value={formData.category}
+                      onChange={(e) =>
+                        setFormData({ ...formData, category: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
+                    >
+                      {EXPENSE_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <Button type="submit" className="w-full">
+                    Record Expense
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Stats */}
