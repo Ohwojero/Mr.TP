@@ -49,6 +49,7 @@ export default function SalesPage() {
   );
   const { items: products } = useSelector((state: RootState) => state.products);
   const { items: sales } = useSelector((state: RootState) => state.sales);
+  const { items: users } = useSelector((state: RootState) => state.users);
   const dispatch = useDispatch();
   const router = useRouter();
 
@@ -56,12 +57,13 @@ export default function SalesPage() {
   const [formData, setFormData] = useState({
     productId: "",
     quantity: 1,
+    paymentMode: "POS" as "POS" | "transfer" | "cash",
   });
 
   useEffect(() => {
     if (
       !isAuthenticated ||
-      (user?.role !== "admin" && user?.role !== "manager")
+      (user?.role !== "admin" && user?.role !== "manager" && user?.role !== "salesgirl")
     ) {
       router.push("/dashboard");
     }
@@ -87,6 +89,7 @@ export default function SalesPage() {
       total: product.price * formData.quantity,
       date: new Date().toISOString(),
       salesPersonId: user?.id || "",
+      paymentMode: formData.paymentMode,
     };
 
     dispatch(addSale(newSale));
@@ -97,11 +100,13 @@ export default function SalesPage() {
       })
     );
 
-    setFormData({ productId: "", quantity: 1 });
+    setFormData({ productId: "", quantity: 1, paymentMode: "POS" });
     setIsOpen(false);
   };
 
   const handleDeleteSale = (saleId: string) => {
+    if (user?.role === "salesgirl") return;
+
     const sale = sales.find((s) => s.id === saleId);
     if (!sale) return;
 
@@ -126,7 +131,7 @@ export default function SalesPage() {
 
   if (
     !isAuthenticated ||
-    (user?.role !== "admin" && user?.role !== "manager")
+    (user?.role !== "admin" && user?.role !== "manager" && user?.role !== "salesgirl")
   ) {
     return null;
   }
@@ -153,12 +158,21 @@ export default function SalesPage() {
     {
       key: "price",
       label: "Unit Price",
-      render: (value: number) => `$${value.toFixed(2)}`,
+      render: (value: number) => `₦${value.toFixed(2)}`,
     },
     {
       key: "total",
       label: "Total",
-      render: (value: number) => `$${value.toFixed(2)}`,
+      render: (value: number) => `₦${value.toFixed(2)}`,
+    },
+    {
+      key: "salesPersonId",
+      label: "Sales Person",
+      searchable: true,
+      render: (value: string) => {
+        const salesPerson = users.find((u) => u.id === value);
+        return salesPerson?.name || "Unknown";
+      },
     },
     {
       key: "date",
@@ -166,6 +180,11 @@ export default function SalesPage() {
       render: (value: string) => new Date(value).toLocaleDateString(),
     },
     {
+      key: "paymentMode",
+      label: "Payment Mode",
+      render: (value: string) => value,
+    },
+    ...(user?.role !== "salesgirl" ? [{
       key: "id",
       label: "Actions",
       render: (value: string) => (
@@ -177,7 +196,7 @@ export default function SalesPage() {
           <Trash2 className="w-4 h-4 text-destructive" />
         </Button>
       ),
-    },
+    }] : []),
   ];
 
   return (
@@ -258,13 +277,32 @@ export default function SalesPage() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="paymentMode">Payment Mode</Label>
+                  <Select
+                    value={formData.paymentMode}
+                    onValueChange={(value: "POS" | "transfer" | "cash") =>
+                      setFormData({ ...formData, paymentMode: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="POS">POS</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {formData.productId && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">
                       Total Amount
                     </p>
                     <p className="text-2xl font-bold">
-                      $
+                      ₦
                       {(
                         (products.find((p) => p.id === formData.productId)
                           ?.price || 0) * formData.quantity
@@ -313,7 +351,7 @@ export default function SalesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-green-600 dark:text-green-400">
-                  ${totalRevenue.toFixed(0)}
+                  ₦{totalRevenue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full">
                   <Plus className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -334,7 +372,7 @@ export default function SalesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                  ${averageOrderValue.toFixed(0)}
+                  ₦{averageOrderValue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-full">
                   <ShoppingCart className="w-6 h-6 text-purple-600 dark:text-purple-400" />

@@ -153,31 +153,32 @@ export default function ReportsPage() {
       const canvas = await html2canvas(element, {
         useCORS: true,
         allowTaint: false,
-        scale: 1,
-        onclone: (clonedDoc) => {
+        onclone: (clonedDoc: Document) => {
           const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach(el => {
-            const style = window.getComputedStyle(el);
+          elements.forEach((el: Element) => {
+            const htmlEl = el as HTMLElement;
+            const style = window.getComputedStyle(htmlEl);
             if (style.backgroundImage && style.backgroundImage !== 'none') {
-              el.style.setProperty('backgroundImage', 'none', 'important');
-              el.style.setProperty('backgroundColor', '#ffffff', 'important');
+              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
             }
             // Handle unsupported color functions
             if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              el.style.setProperty('backgroundColor', '#ffffff', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
             }
             if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              el.style.setProperty('color', '#000000', 'important');
+              htmlEl.style.setProperty('color', '#000000', 'important');
             }
             // Handle other color properties
             ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              if (style[prop] && (style[prop].includes('lab(') || style[prop].includes('lch(') || style[prop].includes('oklab(') || style[prop].includes('oklch('))) {
-                el.style.setProperty(prop, '#000000', 'important');
+              const propValue = style.getPropertyValue(prop);
+              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
+                htmlEl.style.setProperty(prop, '#000000', 'important');
               }
             });
           });
         },
-      });
+      } as any);
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
@@ -221,31 +222,32 @@ export default function ReportsPage() {
       const canvas = await html2canvas(element, {
         useCORS: true,
         allowTaint: false,
-        scale: 1,
-        onclone: (clonedDoc) => {
+        onclone: (clonedDoc: Document) => {
           const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach(el => {
-            const style = window.getComputedStyle(el);
+          elements.forEach((el: Element) => {
+            const htmlEl = el as HTMLElement;
+            const style = window.getComputedStyle(htmlEl);
             if (style.backgroundImage && style.backgroundImage !== 'none') {
-              el.style.setProperty('backgroundImage', 'none', 'important');
-              el.style.setProperty('backgroundColor', '#ffffff', 'important');
+              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
             }
             // Handle unsupported color functions
             if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              el.style.setProperty('backgroundColor', '#ffffff', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
             }
             if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              el.style.setProperty('color', '#000000', 'important');
+              htmlEl.style.setProperty('color', '#000000', 'important');
             }
             // Handle other color properties
             ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              if (style[prop] && (style[prop].includes('lab(') || style[prop].includes('lch(') || style[prop].includes('oklab(') || style[prop].includes('oklch('))) {
-                el.style.setProperty(prop, '#000000', 'important');
+              const propValue = style.getPropertyValue(prop);
+              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
+                htmlEl.style.setProperty(prop, '#000000', 'important');
               }
             });
           });
         },
-      });
+      } as any);
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
@@ -335,7 +337,7 @@ export default function ReportsPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-cyan-600 dark:text-cyan-400">
-                  ${totalRevenue.toFixed(0)}
+                  ₦{totalRevenue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-cyan-100 dark:bg-cyan-900/50 rounded-full">
                   <TrendingUp className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
@@ -356,7 +358,7 @@ export default function ReportsPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-red-600 dark:text-red-400">
-                  ${totalExpenses.toFixed(0)}
+                  ₦{totalExpenses.toFixed(0)}
                 </div>
                 <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-full">
                   <TrendingUp className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -383,7 +385,7 @@ export default function ReportsPage() {
                       : "text-red-600 dark:text-red-400"
                   }`}
                 >
-                  ${netProfit.toFixed(0)}
+                  ₦{netProfit.toFixed(0)}
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full">
                   <TrendingUp
@@ -410,7 +412,7 @@ export default function ReportsPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-amber-600 dark:text-amber-400">
-                  ${totalInventoryValue.toFixed(0)}
+                  ₦{totalInventoryValue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-amber-100 dark:bg-amber-900/50 rounded-full">
                   <TrendingUp className="w-6 h-6 text-amber-600 dark:text-amber-400" />
@@ -477,8 +479,8 @@ export default function ReportsPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value }) =>
-                      `${name}: $${(value as number).toFixed(0)}`
+                    label={(entry) =>
+                      `${entry.name}: ₦${(entry.value as number).toFixed(0)}`
                     }
                     outerRadius={80}
                     fill="#8884d8"
@@ -526,7 +528,7 @@ export default function ReportsPage() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value }) => `${name}: ${value as number}`}
+                    label={(entry) => `${entry.name}: ${entry.value}`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
@@ -594,7 +596,7 @@ export default function ReportsPage() {
                   Average Product Price
                 </span>
                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                  $
+                  ₦
                   {(
                     products.reduce((sum, p) => sum + p.price, 0) /
                       products.length || 0

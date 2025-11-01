@@ -174,7 +174,7 @@ export default function ExpensesPage() {
     {
       key: "amount",
       label: "Amount",
-      render: (value: number) => `$${value.toFixed(2)}`,
+      render: (value: number) => `₦${value.toFixed(2)}`,
     },
     {
       key: "date",
@@ -323,7 +323,7 @@ export default function ExpensesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-red-600 dark:text-red-400">
-                  ${totalExpenses.toFixed(0)}
+                  ₦{totalExpenses.toFixed(0)}
                 </div>
                 <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-full">
                   <DollarSign className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -344,7 +344,7 @@ export default function ExpensesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-orange-600 dark:text-orange-400">
-                  ${monthlyExpenses.toFixed(0)}
+                  ₦{monthlyExpenses.toFixed(0)}
                 </div>
                 <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-full">
                   <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -415,7 +415,7 @@ export default function ExpensesPage() {
                       />
                     </div>
                     <span className="text-sm font-bold text-slate-900 dark:text-white w-24 text-right">
-                      ${item.amount.toFixed(2)}
+                      ₦{item.amount.toFixed(2)}
                     </span>
                   </div>
                 </div>

@@ -33,12 +33,14 @@ export function Sidebar() {
 
   const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: Package },
-    { href: "/inventory", label: "Inventory", icon: Package },
     ...(user?.role === "admin" || user?.role === "manager"
-      ? [
-          { href: "/sales", label: "Sales", icon: ShoppingCart },
-          { href: "/expenses", label: "Expenses", icon: DollarSign },
-        ]
+      ? [{ href: "/inventory", label: "Inventory", icon: Package }]
+      : []),
+    ...(user?.role === "admin" || user?.role === "manager" || user?.role === "salesgirl"
+      ? [{ href: "/sales", label: "Sales", icon: ShoppingCart }]
+      : []),
+    ...(user?.role === "admin" || user?.role === "manager"
+      ? [{ href: "/expenses", label: "Expenses", icon: DollarSign }]
       : []),
     ...(user?.role === "admin"
       ? [
@@ -77,7 +79,7 @@ export function Sidebar() {
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                Inventory
+                {user?.role === "salesgirl" ? "Sales Management" : "Inventory"}
               </h1>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 {user?.name}

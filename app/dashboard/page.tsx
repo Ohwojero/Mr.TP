@@ -135,7 +135,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-green-600 dark:text-green-400">
-                  ${totalRevenue.toFixed(0)}
+                  ₦{totalRevenue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full">
                   <ShoppingCart className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -157,7 +157,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="text-4xl font-bold text-orange-600 dark:text-orange-400">
-                    ${totalExpenses.toFixed(0)}
+                    ₦{totalExpenses.toFixed(0)}
                   </div>
                   <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-full">
                     <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />

@@ -161,34 +161,12 @@ export default function InventoryPage() {
     {
       key: "cost",
       label: "Cost",
-      render: (value: number) => `$${value.toFixed(2)}`,
+      render: (value: number) => `₦${value.toFixed(2)}`,
     },
     {
       key: "price",
       label: "Price",
-      render: (value: number) => `$${value.toFixed(2)}`,
-    },
-    {
-      key: "id",
-      label: "Actions",
-      render: (value: string, row: any) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEditProduct(row)}
-          >
-            <Edit2 className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteProduct(value)}
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-        </div>
-      ),
+      render: (value: number) => `₦${value.toFixed(2)}`,
     },
   ];
 
@@ -424,7 +402,7 @@ export default function InventoryPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-green-600 dark:text-green-400">
-                  ${totalInventoryValue.toFixed(0)}
+                  ₦{totalInventoryValue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full">
                   <Package className="w-6 h-6 text-green-600 dark:text-green-400" />

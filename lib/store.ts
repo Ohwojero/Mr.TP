@@ -29,6 +29,7 @@ export interface Sale {
   total: number
   date: string
   salesPersonId: string
+  paymentMode: "POS" | "transfer" | "cash"
 }
 
 export interface Expense {
@@ -146,6 +147,7 @@ const initialSalesState: SalesState = {
       total: 2400,
       date: new Date().toISOString(),
       salesPersonId: "user2",
+      paymentMode: "POS",
     },
   ],
 }
