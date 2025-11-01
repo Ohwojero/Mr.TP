@@ -38,9 +38,13 @@ import {
   Package,
   AlertTriangle,
   ArrowLeft,
+  Download,
+  Printer,
 } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 export default function InventoryPage() {
   const { user, isAuthenticated } = useSelector(
@@ -115,6 +119,159 @@ export default function InventoryPage() {
   const handleLogout = () => {
     dispatch(logout());
     router.push("/login");
+  };
+
+  const generatePDF = async () => {
+    try {
+      // Target the main content area instead of the entire body
+      const element = document.querySelector("main");
+      if (!element) {
+        console.error("Main content not found");
+        alert("Error: Main content not found. Please refresh the page and try again.");
+        return;
+      }
+
+      // Add a small delay to ensure DOM is ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: false,
+        onclone: (clonedDoc: Document) => {
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach((el: Element) => {
+            const htmlEl = el as HTMLElement;
+            const style = window.getComputedStyle(htmlEl);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
+            }
+            // Handle unsupported color functions
+            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
+            }
+            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
+              htmlEl.style.setProperty('color', '#000000', 'important');
+            }
+            // Handle other color properties
+            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
+              const propValue = style.getPropertyValue(prop);
+              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
+                htmlEl.style.setProperty(prop, '#000000', 'important');
+              }
+            });
+          });
+        },
+      } as any);
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save("inventory-summary.pdf");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Error generating PDF. Please try again. If the problem persists, try refreshing the page.");
+    }
+  };
+
+  const printPDF = async () => {
+    try {
+      // Target the main content area instead of the entire body
+      const element = document.querySelector("main");
+      if (!element) {
+        console.error("Main content not found");
+        alert("Error: Main content not found. Please refresh the page and try again.");
+        return;
+      }
+
+      // Add a small delay to ensure DOM is ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: false,
+        onclone: (clonedDoc: Document) => {
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach((el: Element) => {
+            const htmlEl = el as HTMLElement;
+            const style = window.getComputedStyle(htmlEl);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
+            }
+            // Handle unsupported color functions
+            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
+              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
+            }
+            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
+              htmlEl.style.setProperty('color', '#000000', 'important');
+            }
+            // Handle other color properties
+            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
+              const propValue = style.getPropertyValue(prop);
+              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
+                htmlEl.style.setProperty(prop, '#000000', 'important');
+              }
+            });
+          });
+        },
+      } as any);
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Create a temporary link to download and print the PDF
+      const pdfBlob = pdf.output("blob");
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = "inventory-summary-print.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up the URL object
+      URL.revokeObjectURL(pdfUrl);
+
+      // Note: Automatic printing is not reliable across browsers due to security restrictions
+      // Users will need to manually open the downloaded PDF and print it
+      alert("PDF downloaded. Please open the file and print it manually.");
+    } catch (error) {
+      console.error("Error generating PDF for printing:", error);
+      alert("Error generating PDF for printing. Please try again. If the problem persists, try refreshing the page.");
+    }
   };
 
   if (!isAuthenticated) {
@@ -197,6 +354,23 @@ export default function InventoryPage() {
             <p className="text-slate-600 dark:text-slate-400 mt-1">
               Manage products and stock levels efficiently
             </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              onClick={generatePDF}
+              className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+            <Button
+              onClick={printPDF}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print PDF
+            </Button>
           </div>
 
           {(user?.role === "admin" || user?.role === "manager") && (
