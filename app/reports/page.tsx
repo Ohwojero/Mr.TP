@@ -27,8 +27,7 @@ import {
 import { TrendingUp, Download, Printer } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+
 
 export default function ReportsPage() {
   const { user, isAuthenticated } = useSelector(
@@ -137,157 +136,35 @@ export default function ReportsPage() {
     "#14b8a6",
   ];
 
-  const generatePDF = async () => {
-    try {
-      // Target the main content area instead of the entire body
-      const element = document.querySelector("main");
-      if (!element) {
-        console.error("Main content not found");
-        alert("Error: Main content not found. Please refresh the page and try again.");
-        return;
-      }
+  const downloadReportsAsCSV = () => {
+    const data = [
+      ["Metric", "Value"],
+      ["Total Revenue", `₦${totalRevenue.toFixed(2)}`],
+      ["Total Expenses", `₦${totalExpenses.toFixed(2)}`],
+      ["Net Profit", `₦${netProfit.toFixed(2)}`],
+      ["Inventory Value", `₦${totalInventoryValue.toFixed(2)}`],
+      ["Total Products", products.length.toString()],
+      ["Total Sales Transactions", sales.length.toString()],
+      ["Low Stock Items", lowStockProducts.length.toString()],
+      ["Profit Margin", `${totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0}%`],
+      ["Average Product Price", `₦${(products.reduce((sum, p) => sum + p.price, 0) / products.length || 0).toFixed(2)}`],
+    ];
 
-      // Add a small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
+    const csvContent = data.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
 
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        allowTaint: false,
-        onclone: (clonedDoc: Document) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el: Element) => {
-            const htmlEl = el as HTMLElement;
-            const style = window.getComputedStyle(htmlEl);
-            if (style.backgroundImage && style.backgroundImage !== 'none') {
-              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            // Handle unsupported color functions
-            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              htmlEl.style.setProperty('color', '#000000', 'important');
-            }
-            // Handle other color properties
-            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              const propValue = style.getPropertyValue(prop);
-              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
-                htmlEl.style.setProperty(prop, '#000000', 'important');
-              }
-            });
-          });
-        },
-      } as any);
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save("inventory-reports.pdf");
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again. If the problem persists, try refreshing the page.");
-    }
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `reports_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const printPDF = async () => {
-    try {
-      // Target the main content area instead of the entire body
-      const element = document.querySelector("main");
-      if (!element) {
-        console.error("Main content not found");
-        alert("Error: Main content not found. Please refresh the page and try again.");
-        return;
-      }
-
-      // Add a small delay to ensure DOM is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const canvas = await html2canvas(element, {
-        useCORS: true,
-        allowTaint: false,
-        onclone: (clonedDoc: Document) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el: Element) => {
-            const htmlEl = el as HTMLElement;
-            const style = window.getComputedStyle(htmlEl);
-            if (style.backgroundImage && style.backgroundImage !== 'none') {
-              htmlEl.style.setProperty('backgroundImage', 'none', 'important');
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            // Handle unsupported color functions
-            if (style.backgroundColor && (style.backgroundColor.includes('lab(') || style.backgroundColor.includes('lch(') || style.backgroundColor.includes('oklab(') || style.backgroundColor.includes('oklch('))) {
-              htmlEl.style.setProperty('backgroundColor', '#ffffff', 'important');
-            }
-            if (style.color && (style.color.includes('lab(') || style.color.includes('lch(') || style.color.includes('oklab(') || style.color.includes('oklch('))) {
-              htmlEl.style.setProperty('color', '#000000', 'important');
-            }
-            // Handle other color properties
-            ['borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor'].forEach(prop => {
-              const propValue = style.getPropertyValue(prop);
-              if (propValue && (propValue.includes('lab(') || propValue.includes('lch(') || propValue.includes('oklab(') || propValue.includes('oklch('))) {
-                htmlEl.style.setProperty(prop, '#000000', 'important');
-              }
-            });
-          });
-        },
-      } as any);
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      // Create a temporary link to download and print the PDF
-      const pdfBlob = pdf.output("blob");
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = pdfUrl;
-      link.download = "inventory-reports-print.pdf";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the URL object
-      URL.revokeObjectURL(pdfUrl);
-
-      // Note: Automatic printing is not reliable across browsers due to security restrictions
-      // Users will need to manually open the downloaded PDF and print it
-      alert("PDF downloaded. Please open the file and print it manually.");
-    } catch (error) {
-      console.error("Error generating PDF for printing:", error);
-      alert("Error generating PDF for printing. Please try again. If the problem persists, try refreshing the page.");
-    }
+  const printReports = () => {
+    window.print();
   };
 
   return (
@@ -310,18 +187,18 @@ export default function ReportsPage() {
           </div>
           <div className="flex gap-2">
             <Button
-              onClick={generatePDF}
+              onClick={downloadReportsAsCSV}
               className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download PDF
+              Download CSV
             </Button>
             <Button
-              onClick={printPDF}
+              onClick={printReports}
               className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
               <Printer className="w-4 h-4 mr-2" />
-              Print PDF
+              Print
             </Button>
           </div>
         </div>
