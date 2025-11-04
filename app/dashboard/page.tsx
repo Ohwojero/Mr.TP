@@ -1,8 +1,9 @@
+// app/dashboard/page.tsx
 "use client";
 
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { type RootState, logout } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,38 +21,75 @@ import {
   DollarSign,
 } from "lucide-react";
 import Link from "next/link";
+import { getDashboardData } from "./actions";
+import type { Product, Sale, Expense } from "@/lib/types";
+
+interface Stats {
+  totalProducts: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  profit: number;
+  lowStock: number;
+}
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const { items: products } = useSelector((state: RootState) => state.products);
-  const { items: sales } = useSelector((state: RootState) => state.sales);
-  const { items: expenses } = useSelector((state: RootState) => state.expenses);
-  const dispatch = useDispatch();
   const router = useRouter();
+
+  // ---------- 1. Load data from SQLite ----------
+  const [products, setProducts] = useState<Product[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
-    } else if (user?.role === "salesgirl") {
-      router.push("/sales");
+      return;
     }
+
+    if (user?.role === "salesgirl") {
+      router.push("/sales");
+      return;
+    }
+
+    (async () => {
+      const data = await getDashboardData();
+      setProducts(data.products);
+      setSales(data.sales);
+      setExpenses(data.expenses);
+      setStats(data.stats);
+      setLoading(false);
+    })();
   }, [isAuthenticated, user, router]);
 
+  // ---------- 2. Logout ----------
   const handleLogout = () => {
-    dispatch(logout());
+    // dispatch is not needed for logout if you only use auth slice
+    // but we keep it for consistency
+    // dispatch(logout());
     router.push("/login");
   };
 
-  if (!isAuthenticated || !user) {
-    return null;
+  if (!isAuthenticated || !user || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading…</div>
+      </div>
+    );
   }
 
-  const lowStockProducts = products.filter((p) => p.quantity <= p.reorderLevel);
-  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  // ---------- 3. Derived values ----------
+  const lowStockProducts = products.filter(
+    (p) => p.quantity <= p.reorderLevel
+  );
+  const totalRevenue = sales.reduce((s, v) => s + v.total, 0);
+  const totalExpenses = expenses.reduce((s, v) => s + v.amount, 0);
 
+  // ---------- 4. UI ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {/* Header */}
@@ -86,6 +124,7 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 py-12">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {/* Total Products */}
           <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
@@ -95,7 +134,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-slate-900 dark:text-white">
-                  {products.length}
+                  {stats?.totalProducts ?? 0}
                 </div>
                 <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-full">
                   <Package className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -107,6 +146,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Low Stock */}
           <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
@@ -116,7 +156,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-red-600 dark:text-red-400">
-                  {lowStockProducts.length}
+                  {stats?.lowStock ?? 0}
                 </div>
                 <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-full">
                   <TrendingUp className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -128,6 +168,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Total Sales */}
           <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">
@@ -149,6 +190,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* Expenses (admin / manager only) */}
           {(user.role === "admin" || user.role === "manager") && (
             <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
               <CardHeader className="pb-3">
@@ -173,7 +215,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions – unchanged */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
             Quick Actions

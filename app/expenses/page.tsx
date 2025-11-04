@@ -1,12 +1,10 @@
 "use client";
 
-import type React from "react";
-import Link from "next/link";
-
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type RootState, logout, addExpense, deleteExpense } from "@/lib/store";
+import { type RootState, logout } from "@/lib/store";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,15 +18,25 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, DollarSign, Download, Printer } from "lucide-react";
+
+import {
+  Plus,
+  Trash2,
+  DollarSign,
+  Download,
+  Printer,
+  ArrowLeft,
+} from "lucide-react";
+
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
-import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
+import { getExpenses, addExpense, deleteExpense } from "./actions";
 
 const EXPENSE_CATEGORIES = [
   "Supplies",
@@ -44,55 +52,70 @@ export default function ExpensesPage() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const { items: expenses } = useSelector((state: RootState) => state.expenses);
-  const dispatch = useDispatch();
   const router = useRouter();
 
+  // ---------- UI state ----------
   const [isOpen, setIsOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     description: "",
     amount: 0,
     category: "Supplies",
   });
 
+  // ---------- Data ----------
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ---------- Load expenses ----------
   useEffect(() => {
-    if (
-      !isAuthenticated ||
-      (user?.role !== "admin" && user?.role !== "manager")
-    ) {
-      router.push("/dashboard");
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
     }
+    if (user?.role !== "admin" && user?.role !== "manager") {
+      router.push("/dashboard");
+      return;
+    }
+
+    (async () => {
+      const data = await getExpenses();
+      setExpenses(data);
+      setLoading(false);
+    })();
   }, [isAuthenticated, user, router]);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  // ---------- Add expense ----------
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.description || formData.amount <= 0) return;
+    if (!form.description || form.amount <= 0 || !user) return;
 
-    const newExpense = {
-      id: `exp-${Date.now()}`,
-      description: formData.description,
-      amount: formData.amount,
-      category: formData.category,
-      date: new Date().toISOString(),
-      createdBy: user?.id || "",
-    };
-
-    dispatch(addExpense(newExpense));
-    setFormData({ description: "", amount: 0, category: "Supplies" });
-    setIsOpen(false);
-  };
-
-  const handleDeleteExpense = (expenseId: string) => {
-    if (confirm("Are you sure you want to delete this expense?")) {
-      dispatch(deleteExpense(expenseId));
+    try {
+      await addExpense({
+        ...form,
+        createdBy: user.id,
+      });
+      setForm({ description: "", amount: 0, category: "Supplies" });
+      setIsOpen(false);
+      const refreshed = await getExpenses();
+      setExpenses(refreshed);
+    } catch (err: any) {
+      alert(err.message ?? "Failed to add expense");
     }
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push("/login");
+  // ---------- Delete expense ----------
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("Delete this expense?")) return;
+    try {
+      await deleteExpense(id);
+      const refreshed = await getExpenses();
+      setExpenses(refreshed);
+    } catch (err: any) {
+      alert(err.message ?? "Failed to delete");
+    }
   };
 
+  // ---------- CSV download ----------
   const downloadExpensesAsCSV = () => {
     if (expenses.length === 0) {
       alert("No expenses to download.");
@@ -100,115 +123,104 @@ export default function ExpensesPage() {
     }
 
     const headers = ["Description", "Category", "Amount", "Date"];
-    const csvContent = [
-      headers.join(","),
-      ...expenses.map(expense => [
-        `"${expense.description}"`,
-        `"${expense.category}"`,
-        expense.amount.toFixed(2),
-        new Date(expense.date).toLocaleDateString()
-      ].join(","))
-    ].join("\n");
+    const rows = expenses.map((e) => [
+      `"${e.description}"`,
+      `"${e.category}"`,
+      e.amount.toFixed(2),
+      new Date(e.date).toLocaleDateString(),
+    ]);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `expenses_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `expenses_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const printExpenses = () => {
-    window.print();
-  };
+  const printExpenses = () => window.print();
 
-  if (
-    !isAuthenticated ||
-    (user?.role !== "admin" && user?.role !== "manager")
-  ) {
-    return null;
-  }
-
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => ({
-    category: cat,
-    amount: expenses
-      .filter((e) => e.category === cat)
-      .reduce((sum, e) => sum + e.amount, 0),
-  }));
-
+  // ---------- Calculations ----------
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0);
   const currentMonth = new Date().toLocaleString("default", {
     month: "long",
     year: "numeric",
   });
   const monthlyExpenses = expenses
     .filter((e) => {
-      const expenseDate = new Date(e.date);
+      const d = new Date(e.date);
       const now = new Date();
-      return (
-        expenseDate.getMonth() === now.getMonth() &&
-        expenseDate.getFullYear() === now.getFullYear()
-      );
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     })
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((s, e) => s + e.amount, 0);
 
+  const expensesByCategory = EXPENSE_CATEGORIES.map((cat) => ({
+    category: cat,
+    amount: expenses
+      .filter((e) => e.category === cat)
+      .reduce((s, e) => s + e.amount, 0),
+  }));
+
+  // ---------- Table columns ----------
   const tableColumns = [
-    {
-      key: "description",
-      label: "Description",
-      searchable: true,
-    },
+    { key: "description", label: "Description", searchable: true },
     {
       key: "category",
       label: "Category",
       searchable: true,
-      render: (value: string) => (
+      render: (v: string) => (
         <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-muted text-muted-foreground">
-          {value}
+          {v}
         </span>
       ),
     },
     {
       key: "amount",
       label: "Amount",
-      render: (value: number) => `₦${value.toFixed(2)}`,
+      render: (v: number) => `₦${v.toFixed(2)}`,
     },
     {
       key: "date",
       label: "Date",
-      render: (value: string) => new Date(value).toLocaleDateString(),
+      render: (v: string) => new Date(v).toLocaleDateString(),
     },
     {
       key: "id",
       label: "Actions",
-      render: (value: string) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleDeleteExpense(value)}
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
+      render: (id: string) => (
+        <Button variant="ghost" size="sm" onClick={() => handleDeleteExpense(id)}>
+          <Trash2 className="w-4 h-4 text-red-600" />
         </Button>
       ),
     },
   ];
 
+  // ---------- Loading / Auth guard ----------
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading…
+      </div>
+    );
+  }
+
+  // ---------- Render ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-red-50 to-orange-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Sidebar />
 
-      {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm" className="hover:bg-white/50">
+            <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
           </Link>
+
           <div className="flex-1">
             <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
               <div className="p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-lg">
@@ -225,22 +237,24 @@ export default function ExpensesPage() {
             <Button
               variant="outline"
               onClick={downloadExpensesAsCSV}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 hover:from-blue-600 hover:to-blue-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download CSV
+              CSV
             </Button>
+
             <Button
               variant="outline"
               onClick={printExpenses}
-              className="w-full sm:w-auto bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 hover:from-green-600 hover:to-green-700"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
+
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
+                <Button>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Expense
                 </Button>
@@ -248,56 +262,50 @@ export default function ExpensesPage() {
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Record New Expense</DialogTitle>
-                  <DialogDescription>
-                    Add a new business expense
-                  </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddExpense} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
+                  <div>
+                    <Label>Description</Label>
                     <Input
-                      id="description"
-                      placeholder="e.g., Office supplies purchase"
-                      value={formData.description}
+                      placeholder="e.g., Office supplies"
+                      value={form.description}
                       onChange={(e) =>
-                        setFormData({ ...formData, description: e.target.value })
+                        setForm({ ...form, description: e.target.value })
                       }
                       required
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount</Label>
+                  <div>
+                    <Label>Amount</Label>
                     <Input
-                      id="amount"
                       type="number"
                       step="0.01"
                       min="0"
                       placeholder="0.00"
-                      value={formData.amount}
+                      value={form.amount}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          amount: Number.parseFloat(e.target.value) || 0,
+                        setForm({
+                          ...form,
+                          amount: Number(e.target.value) || 0,
                         })
                       }
                       required
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
+                  <div>
+                    <Label>Category</Label>
                     <select
-                      id="category"
-                      value={formData.category}
+                      value={form.category}
                       onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
+                        setForm({ ...form, category: e.target.value })
                       }
                       className="w-full px-3 py-2 border border-input rounded-md bg-background text-foreground"
                     >
-                      {EXPENSE_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
                         </option>
                       ))}
                     </select>
@@ -424,7 +432,7 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
 
-        {/* Expenses Table with Pagination and Search */}
+        {/* All Expenses Table */}
         <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader className="pb-6">
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">

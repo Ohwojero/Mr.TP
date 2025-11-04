@@ -1,18 +1,10 @@
 "use client";
 
-import type React from "react";
-import Link from "next/link";
-
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  type RootState,
-  logout,
-  addSale,
-  deleteSale,
-  updateStock,
-} from "@/lib/store";
+import { type RootState, logout } from "@/lib/store";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,341 +25,312 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, ShoppingCart, Download, Printer } from "lucide-react";
+
+import {
+  Plus,
+  Trash2,
+  ShoppingCart,
+  Download,
+  Printer,
+  ArrowLeft,
+} from "lucide-react";
+
 import { Sidebar } from "@/components/sidebar";
 import { DataTable } from "@/components/data-table";
-import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
+import {
+  getSalesData,
+  addSaleAction,
+  deleteSaleAction,
+} from "./actions";
+import type { Product, Sale, User } from "@/lib/types";
 
 export default function SalesPage() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const { items: products } = useSelector((state: RootState) => state.products);
-  const { items: sales } = useSelector((state: RootState) => state.sales);
-  const { items: users } = useSelector((state: RootState) => state.users);
-  const dispatch = useDispatch();
   const router = useRouter();
 
-  const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-  const totalSales = sales.length;
-  const averageOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
-
+  // ---------- local UI state ----------
   const [isOpen, setIsOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     productId: "",
     quantity: 1,
     paymentMode: "POS" as "POS" | "transfer" | "cash",
   });
 
+  // ---------- data from SQLite ----------
+  const [data, setData] = useState<{
+    products: Product[];
+    sales: Sale[];
+    users: Pick<User, "id" | "name">[];
+    totalRevenue: number;
+    totalSales: number;
+    averageOrderValue: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // ---------- load data ----------
   useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
+    }
     if (
-      !isAuthenticated ||
-      (user?.role !== "admin" && user?.role !== "manager" && user?.role !== "salesgirl")
+      user?.role !== "admin" &&
+      user?.role !== "manager" &&
+      user?.role !== "salesgirl"
     ) {
       router.push("/dashboard");
-    }
-  }, [isAuthenticated, user, router]);
-
-  const handleAddSale = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.productId || formData.quantity <= 0) return;
-
-    const product = products.find((p) => p.id === formData.productId);
-    if (!product) return;
-
-    if (product.quantity < formData.quantity) {
-      alert("Insufficient stock available");
       return;
     }
 
-    const newSale = {
-      id: `sale-${Date.now()}`,
-      productId: formData.productId,
-      quantity: formData.quantity,
-      price: product.price,
-      total: product.price * formData.quantity,
-      date: new Date().toISOString(),
-      salesPersonId: user?.id || "",
-      paymentMode: formData.paymentMode,
-    };
+    (async () => {
+      const d = await getSalesData();
+      setData(d);
+      setLoading(false);
+    })();
+  }, [isAuthenticated, user, router]);
 
-    dispatch(addSale(newSale));
-    dispatch(
-      updateStock({
-        id: formData.productId,
-        quantity: product.quantity - formData.quantity,
-      })
-    );
+  // ---------- add sale ----------
+  const handleAddSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.productId || form.quantity <= 0 || !user) return;
 
-    setFormData({ productId: "", quantity: 1, paymentMode: "POS" });
-    setIsOpen(false);
-  };
-
-  const handleDeleteSale = (saleId: string) => {
-    if (user?.role === "salesgirl") return;
-
-    const sale = sales.find((s) => s.id === saleId);
-    if (!sale) return;
-
-    if (confirm("Are you sure you want to delete this sale?")) {
-      dispatch(deleteSale(saleId));
-      const product = products.find((p) => p.id === sale.productId);
-      if (product) {
-        dispatch(
-          updateStock({
-            id: sale.productId,
-            quantity: product.quantity + sale.quantity,
-          })
-        );
-      }
+    try {
+      await addSaleAction({
+        ...form,
+        salesPersonId: user.id,
+      });
+      setForm({ productId: "", quantity: 1, paymentMode: "POS" });
+      setIsOpen(false);
+      const refreshed = await getSalesData();
+      setData(refreshed);
+    } catch (err: any) {
+      alert(err.message ?? "Failed to record sale");
     }
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    router.push("/login");
+  // ---------- delete sale ----------
+  const handleDeleteSale = async (saleId: string) => {
+    if (user?.role === "salesgirl") return;
+    if (!confirm("Delete this sale? Stock will be restored.")) return;
+
+    try {
+      await deleteSaleAction(saleId);
+      const refreshed = await getSalesData();
+      setData(refreshed);
+    } catch (err: any) {
+      alert(err.message ?? "Failed to delete sale");
+    }
   };
 
+  // ---------- PDF / Print ----------
   const generatePDF = async () => {
+    if (!data) return;
     try {
-      const jsPDF = (await import("jspdf")).default;
+      const { default: jsPDF } = await import("jspdf");
       const pdf = new jsPDF("p", "mm", "a4");
-
-      // Set font
-      pdf.setFont("helvetica", "normal");
+      pdf.setFont("helvetica");
 
       // Header
       pdf.setFontSize(20);
       pdf.text("Mr. TP - Sales Report", 105, 20, { align: "center" });
-
       pdf.setFontSize(12);
-      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 105, 30, { align: "center" });
-
-      // Table headers
-      const headers = ["Product", "Quantity", "Unit Price", "Total", "Sales Person", "Date", "Payment Mode"];
-      let yPosition = 50;
-
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-
-      headers.forEach((header, index) => {
-        const xPosition = 10 + (index * 25);
-        pdf.text(header, xPosition, yPosition);
+      pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 105, 30, {
+        align: "center",
       });
 
-      yPosition += 10;
-
-      // Table data
+      // Table
+      const headers = [
+        "Product",
+        "Qty",
+        "Unit",
+        "Total",
+        "Sales Person",
+        "Date",
+        "Mode",
+      ];
+      let y = 50;
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      headers.forEach((h, i) => pdf.text(h, 10 + i * 25, y));
+      y += 10;
       pdf.setFont("helvetica", "normal");
 
-      sales.forEach((sale) => {
-        const product = products.find((p) => p.id === sale.productId);
-        const salesPerson = users.find((u) => u.id === sale.salesPersonId);
-
-        const rowData = [
-          product?.name || "Unknown",
-          sale.quantity.toString(),
-          `₦${sale.price.toFixed(2)}`,
-          `₦${sale.total.toFixed(2)}`,
-          salesPerson?.name || "Unknown",
-          new Date(sale.date).toLocaleDateString(),
-          sale.paymentMode,
+      data.sales.forEach((s) => {
+        const row = [
+          s.productName ?? "—",
+          s.quantity.toString(),
+          `₦${s.price.toFixed(2)}`,
+          `₦${s.total.toFixed(2)}`,
+          s.salesPersonName ?? "—",
+          new Date(s.date).toLocaleDateString(),
+          s.paymentMode,
         ];
-
-        rowData.forEach((data, index) => {
-          const xPosition = 10 + (index * 25);
-          pdf.text(data, xPosition, yPosition);
-        });
-
-        yPosition += 8;
-
-        // Add new page if needed
-        if (yPosition > 270) {
+        row.forEach((cell, i) => pdf.text(cell, 10 + i * 25, y));
+        y += 8;
+        if (y > 270) {
           pdf.addPage();
-          yPosition = 20;
+          y = 20;
         }
       });
 
       // Summary
-      yPosition += 10;
+      y += 10;
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(12);
-      pdf.text(`Total Sales: ${sales.length}`, 10, yPosition);
-      yPosition += 8;
-      pdf.text(`Total Revenue: ₦${totalRevenue.toFixed(2)}`, 10, yPosition);
-      yPosition += 8;
-      pdf.text(`Average Order Value: ₦${averageOrderValue.toFixed(2)}`, 10, yPosition);
+      pdf.text(`Total Sales: ${data.totalSales}`, 10, y);
+      y += 8;
+      pdf.text(`Revenue: ₦${data.totalRevenue.toFixed(2)}`, 10, y);
+      y += 8;
+      pdf.text(`Avg: ₦${data.averageOrderValue.toFixed(2)}`, 10, y);
 
       pdf.save("sales-report.pdf");
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("Error generating PDF. Please try again.");
+    } catch (e) {
+      alert("PDF error");
     }
   };
 
-  const printSales = () => {
-    window.print();
-  };
+  const printSales = () => window.print();
 
-  if (
-    !isAuthenticated ||
-    (user?.role !== "admin" && user?.role !== "manager" && user?.role !== "salesgirl")
-  ) {
-    return null;
-  }
-
+  // ---------- receipt ----------
   const handleGenerateReceipt = async (saleId: string) => {
-    const sale = sales.find((s) => s.id === saleId);
-    if (!sale) {
-      alert("Sale not found");
-      return;
-    }
-
-    const product = products.find((p) => p.id === sale.productId);
-    const salesPerson = users.find((u) => u.id === sale.salesPersonId);
+    if (!data) return;
+    const sale = data.sales.find((s) => s.id === saleId);
+    if (!sale) return alert("Sale not found");
 
     try {
-      const jsPDF = (await import("jspdf")).default;
+      const { default: jsPDF } = await import("jspdf");
       const pdf = new jsPDF("p", "mm", "a4");
+      pdf.setFont("helvetica");
 
-      // Set font
-      pdf.setFont("helvetica", "normal");
-
-      // Header
       pdf.setFontSize(20);
       pdf.text("Mr. TP", 105, 20, { align: "center" });
-
       pdf.setFontSize(12);
       pdf.text("Sales Receipt", 105, 30, { align: "center" });
 
-      // Receipt details
+      let y = 50;
       pdf.setFontSize(10);
-      let yPosition = 50;
+      pdf.text(`Receipt #: ${sale.id}`, 20, y);
+      y += 10;
+      pdf.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 20, y);
+      y += 10;
+      pdf.text(`Sales Person: ${sale.salesPersonName ?? "—"}`, 20, y);
+      y += 20;
 
-      pdf.text(`Receipt #: ${sale.id}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Sales Person: ${salesPerson?.name || "Unknown"}`, 20, yPosition);
-      yPosition += 20;
-
-      // Product details
       pdf.setFontSize(12);
-      pdf.text(`Product: ${product?.name || "Unknown"}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Quantity: ${sale.quantity}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Unit Price: ₦${sale.price.toFixed(2)}`, 20, yPosition);
-      yPosition += 10;
-      pdf.text(`Payment Mode: ${sale.paymentMode}`, 20, yPosition);
-      yPosition += 20;
+      pdf.text(`Product: ${sale.productName ?? "—"}`, 20, y);
+      y += 10;
+      pdf.text(`Qty: ${sale.quantity}`, 20, y);
+      y += 10;
+      pdf.text(`Unit: ₦${sale.price.toFixed(2)}`, 20, y);
+      y += 10;
+      pdf.text(`Mode: ${sale.paymentMode}`, 20, y);
+      y += 20;
 
-      // Total
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text(`Total: ₦${sale.total.toFixed(2)}`, 105, yPosition, { align: "center" });
-      yPosition += 20;
-
-      // Footer
-      pdf.setFont("helvetica", "normal");
+      pdf.text(`Total: ₦${sale.total.toFixed(2)}`, 105, y, { align: "center" });
+      y += 20;
       pdf.setFontSize(10);
-      pdf.text("Thank you for your business!", 105, yPosition, { align: "center" });
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Thank you for your business!", 105, y, { align: "center" });
 
-      // Save the PDF
       pdf.save(`receipt-${sale.id}.pdf`);
-    } catch (error) {
-      console.error("Error generating receipt:", error);
-      alert("Error generating receipt. Please try again.");
+    } catch (e) {
+      alert("Receipt error");
     }
   };
 
+  // ---------- table columns ----------
   const tableColumns = [
     {
-      key: "productId",
+      key: "productName",
       label: "Product",
       searchable: true,
-      render: (value: string) => {
-        const product = products.find((p) => p.id === value);
-        return product?.name || "Unknown";
-      },
+      render: (v: string) => v ?? "—",
     },
-    {
-      key: "quantity",
-      label: "Quantity",
-      render: (value: number) => value,
-    },
+    { key: "quantity", label: "Qty" },
     {
       key: "price",
-      label: "Unit Price",
-      render: (value: number) => `₦${value.toFixed(2)}`,
+      label: "Unit",
+      render: (v: number) => `₦${v.toFixed(2)}`,
     },
     {
       key: "total",
       label: "Total",
-      render: (value: number) => `₦${value.toFixed(2)}`,
+      render: (v: number) => `₦${v.toFixed(2)}`,
     },
     {
-      key: "salesPersonId",
+      key: "salesPersonName",
       label: "Sales Person",
       searchable: true,
-      render: (value: string) => {
-        const salesPerson = users.find((u) => u.id === value);
-        return salesPerson?.name || "Unknown";
-      },
+      render: (v: string) => v ?? "—",
     },
     {
       key: "date",
       label: "Date",
-      render: (value: string) => new Date(value).toLocaleDateString(),
+      render: (v: string) => new Date(v).toLocaleDateString(),
     },
-    {
-      key: "paymentMode",
-      label: "Payment Mode",
-      render: (value: string) => value,
-    },
+    { key: "paymentMode", label: "Mode" },
     {
       key: "id",
       label: "Receipt",
-      render: (value: string) => (
+      render: (id: string) => (
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => handleGenerateReceipt(value)}
+          onClick={() => handleGenerateReceipt(id)}
         >
           <Download className="w-4 h-4" />
         </Button>
       ),
     },
-    ...(user?.role !== "salesgirl" ? [{
-      key: "id",
-      label: "Actions",
-      render: (value: string) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleDeleteSale(value)}
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
-        </Button>
-      ),
-    }] : []),
+    ...(user?.role !== "salesgirl"
+      ? [
+          {
+            key: "id",
+            label: "Delete",
+            render: (id: string) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteSale(id)}
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </Button>
+            ),
+          },
+        ]
+      : []),
   ];
 
+  // ---------- loading / auth guard ----------
+  if (loading || !data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading…
+      </div>
+    );
+  }
+
+  // ---------- render ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Sidebar />
 
-      {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
           {user?.role !== "salesgirl" && (
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="hover:bg-white/50">
+              <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
@@ -388,20 +351,21 @@ export default function SalesPage() {
           <div className="flex gap-2">
             <Button
               onClick={generatePDF}
-              className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download PDF
+              PDF
             </Button>
             <Button
               onClick={printSales}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
           </div>
 
+          {/* New Sale Dialog */}
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -412,59 +376,55 @@ export default function SalesPage() {
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Record New Sale</DialogTitle>
-                <DialogDescription>
-                  Create a new sales transaction
-                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddSale} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="product">Product</Label>
+                {/* Product */}
+                <div>
+                  <Label>Product</Label>
                   <Select
-                    value={formData.productId}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, productId: value })
-                    }
+                    value={form.productId}
+                    onValueChange={(v) => setForm({ ...form, productId: v })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a product" />
+                      <SelectValue placeholder="Select product" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name} (Stock: {product.quantity})
+                      {data.products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name} (Stock: {p.quantity})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Quantity</Label>
+                {/* Quantity */}
+                <div>
+                  <Label>Quantity</Label>
                   <Input
-                    id="quantity"
                     type="number"
                     min="1"
-                    value={formData.quantity}
+                    value={form.quantity}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        quantity: Number.parseInt(e.target.value) || 1,
+                      setForm({
+                        ...form,
+                        quantity: Number(e.target.value) || 1,
                       })
                     }
-                    required
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMode">Payment Mode</Label>
+                {/* Payment mode */}
+                <div>
+                  <Label>Payment Mode</Label>
                   <Select
-                    value={formData.paymentMode}
-                    onValueChange={(value: "POS" | "transfer" | "cash") =>
-                      setFormData({ ...formData, paymentMode: value })
+                    value={form.paymentMode}
+                    onValueChange={(v: any) =>
+                      setForm({ ...form, paymentMode: v })
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select payment mode" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="POS">POS</SelectItem>
@@ -474,7 +434,8 @@ export default function SalesPage() {
                   </Select>
                 </div>
 
-                {formData.productId && (
+                {/* Total preview */}
+                {form.productId && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm text-muted-foreground">
                       Total Amount
@@ -482,8 +443,8 @@ export default function SalesPage() {
                     <p className="text-2xl font-bold">
                       ₦
                       {(
-                        (products.find((p) => p.id === formData.productId)
-                          ?.price || 0) * formData.quantity
+                        (data.products.find((p) => p.id === form.productId)
+                          ?.price || 0) * form.quantity
                       ).toFixed(2)}
                     </p>
                   </div>
@@ -508,7 +469,7 @@ export default function SalesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-blue-600 dark:text-blue-400">
-                  {totalSales}
+                  {data.totalSales}
                 </div>
                 <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-full">
                   <ShoppingCart className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -529,7 +490,7 @@ export default function SalesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-green-600 dark:text-green-400">
-                  ₦{totalRevenue.toFixed(0)}
+                  ₦{data.totalRevenue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-full">
                   <Plus className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -550,7 +511,7 @@ export default function SalesPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                  ₦{averageOrderValue.toFixed(0)}
+                  ₦{data.averageOrderValue.toFixed(0)}
                 </div>
                 <div className="p-3 bg-purple-100 dark:bg-purple-900/50 rounded-full">
                   <ShoppingCart className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -563,7 +524,7 @@ export default function SalesPage() {
           </Card>
         </div>
 
-        {/* Sales Table with Pagination and Search */}
+        {/* Table */}
         <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader className="pb-6">
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -575,14 +536,14 @@ export default function SalesPage() {
             <CardDescription className="text-slate-600 dark:text-slate-400 text-base">
               Total transactions:{" "}
               <span className="font-semibold text-slate-900 dark:text-white">
-                {sales.length}
+                {data.sales.length}
               </span>
             </CardDescription>
           </CardHeader>
-          <CardContent id="sales-table-container">
+          <CardContent>
             <DataTable
               columns={tableColumns}
-              data={sales}
+              data={data.sales}
               itemsPerPage={10}
               searchPlaceholder="Search by product name..."
             />
@@ -592,6 +553,3 @@ export default function SalesPage() {
     </div>
   );
 }
-
-
-

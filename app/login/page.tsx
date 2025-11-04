@@ -1,7 +1,7 @@
+// app/login/page.tsx (or wherever your page is)
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useDispatch } from "react-redux"
 import { useRouter } from "next/navigation"
@@ -12,6 +12,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { compare } from 'bcrypt'
+import { db } from '@/lib/db' 
+import { authenticateUser } from './actions'
+
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,27 +26,13 @@ export default function LoginPage() {
   const dispatch = useDispatch()
   const router = useRouter()
 
-  // Demo users for testing
-  const demoUsers = [
-    { email: "admin@inventory.com", password: "admin123", id: "user1", name: "Admin User", role: "admin" as const },
-    {
-      email: "manager@inventory.com",
-      password: "manager123",
-      id: "user2",
-      name: "Manager User",
-      role: "manager" as const,
-    },
-    { email: "sales@inventory.com", password: "sales123", id: "user3", name: "Sales Girl", role: "salesgirl" as const },
-  ]
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     try {
-      // Find matching demo user
-      const user = demoUsers.find((u) => u.email === email && u.password === password)
+      const user = await authenticateUser(email, password)
 
       if (!user) {
         setError("Invalid email or password. Try admin@inventory.com / admin123")
@@ -49,13 +40,18 @@ export default function LoginPage() {
         return
       }
 
-      // Dispatch login action
-      dispatch(login({ id: user.id, email: user.email, name: user.name, role: user.role }))
+      dispatch(login({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role as 'admin' | 'manager' | 'salesgirl'
+      }))
 
-      // Redirect to dashboard
       router.push("/dashboard")
     } catch (err) {
+      console.error(err)
       setError("An error occurred during login")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -106,14 +102,7 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
 
-            <div className="mt-4 p-3 bg-muted rounded-lg text-sm">
-              <p className="font-semibold mb-2">Demo Credentials:</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>Admin: admin@inventory.com / admin123</li>
-                <li>Manager: manager@inventory.com / manager123</li>
-                <li>Sales: sales@inventory.com / sales123</li>
-              </ul>
-            </div>
+          
           </form>
         </CardContent>
       </Card>

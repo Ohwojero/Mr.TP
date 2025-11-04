@@ -1,13 +1,11 @@
 "use client";
 
 import { Sidebar } from "@/components/sidebar";
-
 import type React from "react";
-
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type RootState, logout, addUser, deleteUser } from "@/lib/store";
+import { type RootState, logout } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,49 +36,76 @@ import Link from "next/link";
 import { DataTable } from "@/components/data-table";
 import { ArrowLeft } from "lucide-react";
 
-export default function UsersPage() {
-  const { user, isAuthenticated } = useSelector(
-    (state: RootState) => state.auth
-  );
-  const { items: users } = useSelector((state: RootState) => state.users);
-  const dispatch = useDispatch();
-  const router = useRouter();
+// Server actions
+import { getAllUsers, createUser, deleteUserById, type User } from "./actions";
 
+export default function UsersPage() {
+  const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     name: "",
     role: "manager" as const,
+    password: "",
   });
+  const [error, setError] = useState("");
+  const router = useRouter();
 
+  // Load users
+  useEffect(() => {
+    async function load() {
+      const data = await getAllUsers();
+      setUsers(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  // Auth guard
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") {
       router.push("/dashboard");
     }
   }, [isAuthenticated, user, router]);
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.name) return;
+    setError("");
 
-    const newUser = {
-      id: `user-${Date.now()}`,
-      email: formData.email,
-      name: formData.name,
-      role: formData.role,
-    };
+    if (!formData.email || !formData.name || !formData.password) {
+      setError("All fields are required");
+      return;
+    }
 
-    dispatch(addUser(newUser));
-    setFormData({ email: "", name: "", role: "manager" });
-    setIsOpen(false);
+    try {
+      const newUser = await createUser({
+        email: formData.email,
+        name: formData.name,
+        role: formData.role,
+        password: formData.password,
+      });
+
+      if (newUser) {
+        setUsers((prev) => [...prev, newUser]);
+        setFormData({ email: "", name: "", role: "manager", password: "" });
+        setIsOpen(false);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to create user");
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (userId === user?.id) {
       alert("Cannot delete your own account");
       return;
     }
-    dispatch(deleteUser(userId));
+    if (!confirm("Delete this user?")) return;
+
+    await deleteUserById(userId);
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
   const handleLogout = () => {
@@ -88,25 +113,16 @@ export default function UsersPage() {
     router.push("/login");
   };
 
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null;
-  }
+  const dispatch = useDispatch();
+
+  if (!isAuthenticated || user?.role !== "admin") return null;
 
   const tableColumns = [
-    {
-      key: "name",
-      label: "Name",
-      searchable: true,
-    },
-    {
-      key: "email",
-      label: "Email",
-      searchable: true,
-    },
+    { key: "name", label: "Name", searchable: true },
+    { key: "email", label: "Email", searchable: true },
     {
       key: "role",
       label: "Role",
-      searchable: true,
       render: (value: string) => (
         <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
           {value}
@@ -133,7 +149,6 @@ export default function UsersPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Sidebar />
 
-      {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
           <Link href="/dashboard">
@@ -165,10 +180,15 @@ export default function UsersPage() {
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
                 <DialogDescription>
-                  Create a new user account with assigned role
+                  Create a new user account with assigned role and password
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddUser} className="space-y-4">
+                {error && (
+                  <div className="p-3 bg-red-100 text-red-700 rounded">
+                    {error}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -176,33 +196,36 @@ export default function UsersPage() {
                     type="email"
                     placeholder="user@example.com"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
                     id="name"
                     placeholder="John Doe"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                   />
                 </div>
-
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value: any) =>
-                      setFormData({ ...formData, role: value })
-                    }
+                    onValueChange={(v: any) => setFormData({ ...formData, role: v })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -214,7 +237,6 @@ export default function UsersPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <Button type="submit" className="w-full">
                   Create User
                 </Button>
@@ -223,7 +245,6 @@ export default function UsersPage() {
           </Dialog>
         </div>
 
-        {/* Users Table with Pagination and Search */}
         <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
           <CardHeader className="pb-6">
             <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -233,19 +254,20 @@ export default function UsersPage() {
               All Users
             </CardTitle>
             <CardDescription className="text-slate-600 dark:text-slate-400 text-base">
-              Total users:{" "}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {users.length}
-              </span>
+              Total users: <span className="font-semibold">{users.length}</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DataTable
-              columns={tableColumns}
-              data={users}
-              itemsPerPage={10}
-              searchPlaceholder="Search by name or email..."
-            />
+            {loading ? (
+              <p>Loading users...</p>
+            ) : (
+              <DataTable
+                columns={tableColumns}
+                data={users}
+                itemsPerPage={10}
+                searchPlaceholder="Search by name or email..."
+              />
+            )}
           </CardContent>
         </Card>
       </main>

@@ -2,9 +2,9 @@
 
 import { useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { RootState } from "@/lib/store";
-import { useDispatch } from "react-redux";
+
 import {
   Card,
   CardContent,
@@ -28,34 +28,52 @@ import { TrendingUp, Download, Printer } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Button } from "@/components/ui/button";
 
+import {
+  getProducts,
+  getSales,
+  getExpenses,
+  type Product,
+  type Sale,
+  type Expense,
+} from "./actions";
 
 export default function ReportsPage() {
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const { items: products } = useSelector((state: RootState) => state.products);
-  const { items: sales } = useSelector((state: RootState) => state.sales);
-  const { items: expenses } = useSelector((state: RootState) => state.expenses);
-  const dispatch = useDispatch();
   const router = useRouter();
 
+  // ---------- Data ----------
+  const [products, setProducts] = useState<Product[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ---------- Load data ----------
   useEffect(() => {
-    if (
-      !isAuthenticated ||
-      (user?.role !== "admin" && user?.role !== "manager")
-    ) {
-      router.push("/dashboard");
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
     }
+    if (user?.role !== "admin" && user?.role !== "manager") {
+      router.push("/dashboard");
+      return;
+    }
+
+    (async () => {
+      const [p, s, e] = await Promise.all([
+        getProducts(),
+        getSales(),
+        getExpenses(),
+      ]);
+      setProducts(p);
+      setSales(s);
+      setExpenses(e);
+      setLoading(false);
+    })();
   }, [isAuthenticated, user, router]);
 
-  if (
-    !isAuthenticated ||
-    (user?.role !== "admin" && user?.role !== "manager")
-  ) {
-    return null;
-  }
-
-  // Calculate metrics
+  // ---------- Calculations ----------
   const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalRevenue - totalExpenses;
@@ -75,53 +93,28 @@ export default function ReportsPage() {
   });
 
   // Expenses by category
-  const expensesByCategory = [
-    {
-      name: "Supplies",
+  const expenseCategories = [
+    "Supplies",
+    "Utilities",
+    "Rent",
+    "Salaries",
+    "Marketing",
+    "Maintenance",
+    "Other",
+  ];
+  const expensesByCategory = expenseCategories
+    .map((cat) => ({
+      name: cat,
       value: expenses
-        .filter((e) => e.category === "Supplies")
+        .filter((e) => e.category === cat)
         .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Utilities",
-      value: expenses
-        .filter((e) => e.category === "Utilities")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Rent",
-      value: expenses
-        .filter((e) => e.category === "Rent")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Salaries",
-      value: expenses
-        .filter((e) => e.category === "Salaries")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Marketing",
-      value: expenses
-        .filter((e) => e.category === "Marketing")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Maintenance",
-      value: expenses
-        .filter((e) => e.category === "Maintenance")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-    {
-      name: "Other",
-      value: expenses
-        .filter((e) => e.category === "Other")
-        .reduce((sum, e) => sum + e.amount, 0),
-    },
-  ].filter((item) => item.value > 0);
+    }))
+    .filter((item) => item.value > 0);
 
   // Stock status
-  const lowStockProducts = products.filter((p) => p.quantity <= p.reorderLevel);
+  const lowStockProducts = products.filter(
+    (p) => p.quantity <= p.reorderLevel
+  );
   const adequateStockProducts = products.filter(
     (p) => p.quantity > p.reorderLevel
   );
@@ -136,7 +129,17 @@ export default function ReportsPage() {
     "#14b8a6",
   ];
 
+  // ---------- CSV ----------
   const downloadReportsAsCSV = () => {
+    const profitMargin =
+      totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : "0";
+    const avgPrice =
+      products.length > 0
+        ? (
+            products.reduce((sum, p) => sum + p.price, 0) / products.length
+          ).toFixed(2)
+        : "0.00";
+
     const data = [
       ["Metric", "Value"],
       ["Total Revenue", `₦${totalRevenue.toFixed(2)}`],
@@ -146,33 +149,41 @@ export default function ReportsPage() {
       ["Total Products", products.length.toString()],
       ["Total Sales Transactions", sales.length.toString()],
       ["Low Stock Items", lowStockProducts.length.toString()],
-      ["Profit Margin", `${totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0}%`],
-      ["Average Product Price", `₦${(products.reduce((sum, p) => sum + p.price, 0) / products.length || 0).toFixed(2)}`],
+      ["Profit Margin", `${profitMargin}%`],
+      ["Average Product Price", `₦${avgPrice}`],
     ];
 
-    const csvContent = data.map(row => row.map(cell => `"${cell}"`).join(",")).join("\n");
+    const csv = data
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `reports_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `reports_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
-    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const printReports = () => {
-    window.print();
-  };
+  const printReports = () => window.print();
 
+  // ---------- Loading / Auth guard ----------
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading reports…
+      </div>
+    );
+  }
+
+  // ---------- Render ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Sidebar />
 
-      {/* Main Content */}
       <main className="md:ml-64 p-4 md:p-8">
+        {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
@@ -188,14 +199,14 @@ export default function ReportsPage() {
           <div className="flex gap-2">
             <Button
               onClick={downloadReportsAsCSV}
-              className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download CSV
+              CSV
             </Button>
             <Button
               onClick={printReports}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print
@@ -321,12 +332,7 @@ export default function ReportsPage() {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={salesByProduct}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                  />
+                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
                   <YAxis />
                   <Tooltip />
                   <Bar dataKey="revenue" fill="#3b82f6" />
@@ -363,7 +369,7 @@ export default function ReportsPage() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {expensesByCategory.map((entry, index) => (
+                    {expensesByCategory.map((_, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -377,7 +383,7 @@ export default function ReportsPage() {
           </Card>
         </div>
 
-        {/* Stock Status */}
+        {/* Stock Status + Summary */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardHeader className="pb-6">
@@ -396,10 +402,7 @@ export default function ReportsPage() {
                 <PieChart>
                   <Pie
                     data={[
-                      {
-                        name: "Adequate Stock",
-                        value: adequateStockProducts.length,
-                      },
+                      { name: "Adequate Stock", value: adequateStockProducts.length },
                       { name: "Low Stock", value: lowStockProducts.length },
                     ]}
                     cx="50%"
@@ -419,7 +422,6 @@ export default function ReportsPage() {
             </CardContent>
           </Card>
 
-          {/* Summary Statistics */}
           <Card className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-0 shadow-lg">
             <CardHeader className="pb-6">
               <CardTitle className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
@@ -474,10 +476,12 @@ export default function ReportsPage() {
                 </span>
                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
                   ₦
-                  {(
-                    products.reduce((sum, p) => sum + p.price, 0) /
-                      products.length || 0
-                  ).toFixed(2)}
+                  {products.length > 0
+                    ? (
+                        products.reduce((sum, p) => sum + p.price, 0) /
+                        products.length
+                      ).toFixed(2)
+                    : "0.00"}
                 </span>
               </div>
             </CardContent>
